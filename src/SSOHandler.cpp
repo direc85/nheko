@@ -7,6 +7,11 @@
 #include <QHttpServerResponse>
 #include <QTimer>
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+#include <QTcpServer>
+#include "Logging.h"
+#endif
+
 SSOHandler::SSOHandler(QObject *)
   : server{new QHttpServer}
 {
@@ -21,9 +26,21 @@ SSOHandler::SSOHandler(QObject *)
             return tr("Missing loginToken for SSO login!");
         }
     });
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    QTcpServer *tcpServer =  new QTcpServer();
+    if (tcpServer->listen() && server->bind(tcpServer)) {
+        this->port = tcpServer->serverPort();
+    } else {
+        nhlog::net()->critical("SSO listener failed: {}", tcpServer->errorString().toStdString());
+        delete tcpServer;
+        tcpServer = nullptr;
+    }
+#else
     server->listen();
     if (server->serverPorts().size() > 0)
         this->port = server->serverPorts().first();
+#endif
 }
 
 SSOHandler::~SSOHandler()
